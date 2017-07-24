@@ -40,6 +40,7 @@ import traceback # used for error handling
 # KH Comment: Why the above line importing arceditor? I have never used this in a script run from an Arc toolbox.
 
 # Script arguments
+# KH Comment: Pare down the number of user-entered parameters. Have them enter an output TIF; get the output directory from that and then generate the outputGDB and mosaicName automatically. Get the Colormap from the first of the input rasters.
 outputGDB = arcpy.GetParameterAsText(0)
 mosaicName = arcpy.GetParameterAsText(1)
 inputRastFolder = arcpy.GetParameterAsText(2) #Folder with raster files you want to be added to the mosaic dataset
@@ -50,7 +51,8 @@ inputColormap = arcpy.GetParameterAsText(6)
 
 # Local variables:
 mosaicFile = outputGDB + os.sep + mosaicName
-cellSize = 1 #3.28084                     #Set output cell size to 1 (meter), rather than 3.28084 feet
+cellSizeIn = 3.28084  #You need the input cell size first, which is in feet. Actually it would be more elegant to grab the cell size from one of the input rasters, rather than hard-coding the number.
+cellSizeOut = 1  #Set output cell size to 1 (meter), rather than 3.28084 (feet)
 resamp = "NEAREST"
 outDir = os.path.dirname(outProjRaster)
 copyMosaic = outDir + os.sep + "mosaic_copy.tif"    #Place copied mosaic in same folder as output TIFF
@@ -80,7 +82,7 @@ arcpy.AddMessage('Importing geometry and setting mosaic dataset properties...')
 arcpy.ImportMosaicDatasetGeometry_management(mosaicFile, "FOOTPRINT", "Name", inputFootprint, "Tile")
 
 # Process: Set Mosaic Dataset Properties
-arcpy.SetMosaicDatasetProperties_management(mosaicFile, "4100", "15000", "None;JPEG;LZ77;LERC", "None", "75", "0.01", resamp, "CLIP", "FOOTPRINTS_MAY_CONTAIN_NODATA", "CLIP", "NOT_APPLY", "", "NONE", "NorthWest;Center;LockRaster;ByAttribute;Nadir;Viewpoint;Seamline;None", "NorthWest", "", "", "ASCENDING", "FIRST", "10", "600", "300", "20", "0.8", cellSize, "Basic", "Name;MinPS;MaxPS;LowPS;HighPS;Tag;GroupName;ProductName;CenterX;CenterY;ZOrder;Shape_Length;Shape_Area;Thumbnail", "DISABLED", "", "", "", "", "20", "1000", "THEMATIC", "1", "", "None")
+arcpy.SetMosaicDatasetProperties_management(mosaicFile, "4100", "15000", "None;JPEG;LZ77;LERC", "None", "75", "0.01", resamp, "CLIP", "FOOTPRINTS_MAY_CONTAIN_NODATA", "CLIP", "NOT_APPLY", "", "NONE", "NorthWest;Center;LockRaster;ByAttribute;Nadir;Viewpoint;Seamline;None", "NorthWest", "", "", "ASCENDING", "FIRST", "10", "600", "300", "20", "0.8", cellSizeIn, "Basic", "Name;MinPS;MaxPS;LowPS;HighPS;Tag;GroupName;ProductName;CenterX;CenterY;ZOrder;Shape_Length;Shape_Area;Thumbnail", "DISABLED", "", "", "", "", "20", "1000", "THEMATIC", "1", "", "None")
 
 arcpy.AddMessage('Copying mosaic dataset...')
 
@@ -88,7 +90,7 @@ arcpy.CopyRaster_management(mosaicFile, copyMosaic)    #Note - need to parameter
 
 arcpy.AddMessage('Projecting mosaic dataset...')
 # Process: Project Raster
-arcpy.ProjectRaster_management(copyMosaic, outProjRaster, outCoordSys, resamp, cellSize, geoTrans, "", inCoordSys) 
+arcpy.ProjectRaster_management(copyMosaic, outProjRaster, outCoordSys, resamp, cellSizeOut, geoTrans, "", inCoordSys) 
 
 # Process: Add Colormap
 arcpy.AddColormap_management(outProjRaster, inputColormap, "")
