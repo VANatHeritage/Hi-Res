@@ -2,8 +2,9 @@
 # CreateLandCoverMosaic.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2017-07-17
-# Last Edit: 2017-07-19
+# Last Edit: 2017-07-24
 # Creator(s):  Roy Gilb and DJ Helkowski
+# Edited by: Kirsten Hazler
 # 
 # Summary:
 # This model creates a mosaic dataset and places it into an output geodatabase. It then adds raster tiles to the mosaic dataset. Next, the model imports mosaic dataset geometry from an imported footprint. 
@@ -35,7 +36,8 @@ import os # provides access to operating system funtionality such as file and di
 import sys # provides access to Python system functions
 import traceback # used for error handling
 # Set the necessary product code
-import arceditor
+# import arceditor
+# KH Comment: Why the above line importing arceditor? I have never used this in a script run from an Arc toolbox.
 
 # Script arguments
 outputGDB = arcpy.GetParameterAsText(0)
@@ -50,10 +52,12 @@ inputColormap = arcpy.GetParameterAsText(6)
 mosaicFile = outputGDB + os.sep + mosaicName
 cellSize = 1 #3.28084                     #Set output cell size to 1 (meter), rather than 3.28084 feet
 resamp = "NEAREST"
-copyMosaic = "F:\Gilb_Work\LandCover\Land_Cover_Raster_Tiles_Southern_Rivers_Area_3\SouthRivers3_Output\mosaic_copy.tif"    #Note - need to parameterize the output folder here
+outDir = os.path.dirname(outProjRaster)
+copyMosaic = outDir + os.sep + "mosaic_copy.tif"    #Place copied mosaic in same folder as output TIFF
 
 outCoordSys = arcpy.Describe(snapRaster).spatialReference
 inCoordSys  = arcpy.Describe(inputColormap).spatialReference
+geoTrans = "NAD_1983_HARN_To_WGS_1984 + WGS_1984_(ITRF00)_To_NAD_1983"
 
 
 # Set Geoprocessing environments
@@ -84,8 +88,7 @@ arcpy.CopyRaster_management(mosaicFile, copyMosaic)    #Note - need to parameter
 
 arcpy.AddMessage('Projecting mosaic dataset...')
 # Process: Project Raster
-arcpy.ProjectRaster_management(copyMosaic, outProjRaster, outCoordSys, resamp, cellSize, "NAD_1983_To_HARN_Virginia", "", inCoordSys) #NAD_1983_HARN_To_WGS_1984 + WGS_1984_(ITRF00)_To_NAD_1983  ?
+arcpy.ProjectRaster_management(copyMosaic, outProjRaster, outCoordSys, resamp, cellSize, geoTrans, "", inCoordSys) 
 
 # Process: Add Colormap
 arcpy.AddColormap_management(outProjRaster, inputColormap, "")
-
