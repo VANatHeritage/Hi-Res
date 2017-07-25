@@ -77,9 +77,9 @@ arcpy.env.snapRaster = snapRaster
 # rasterList = 
 
 ### To do: get the input coordinate system from the first raster in the list
-# inCoordSyst # define this variable here
+# inCoordSys # define this variable here
 
-### To do: check coordinate systems of all rasters in list; if not all the same as inCoordSyst, throw error and abort.
+### To do: check coordinate systems of all rasters in list; if not all the same as inCoordSys, throw error and abort.
 
 # Process: Create Mosaic Dataset
 arcpy.CreateMosaicDataset_management(outputGDB, mosaicName, inCoordSys, "1", "8_BIT_UNSIGNED", "NONE", "")
