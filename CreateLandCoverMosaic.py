@@ -2,7 +2,7 @@
 # CreateLandCoverMosaic.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2017-07-17
-# Last Edit: 2017-07-24
+# Last Edit: 2017-07-25
 # Creator(s):  Roy Gilb and DJ Helkowski
 # Edited by: Kirsten Hazler
 # 
@@ -41,31 +41,45 @@ import traceback # used for error handling
 
 # Script arguments
 # KH Comment: Pare down the number of user-entered parameters. Have them enter an output TIF; get the output directory from that and then generate the outputGDB and mosaicName automatically. Get the Colormap from the first of the input rasters.
-outputGDB = arcpy.GetParameterAsText(0)
-mosaicName = arcpy.GetParameterAsText(1)
-inputRastFolder = arcpy.GetParameterAsText(2) #Folder with raster files you want to be added to the mosaic dataset
-snapRaster = arcpy.GetParameterAsText(3)
-inputFootprint = arcpy.GetParameterAsText(4)
-outProjRaster = arcpy.GetParameterAsText(5)
-inputColormap = arcpy.GetParameterAsText(6)
+# outputGDB = arcpy.GetParameterAsText(0) # Hard-code this in instead
+# mosaicName = arcpy.GetParameterAsText(1) # Hard-code this in instead
+inputRastFolder = arcpy.GetParameterAsText(0) #Folder with raster files you want to be added to the mosaic dataset
+filterString = arcpy.GetParameterAsText(1) # String (e.g., "N" or "S") used to restrict rasters selected for processing
+### In the toolbox, make the above a drop-down with only two options
+snapRaster = arcpy.GetParameterAsText(2)
+inputFootprint = arcpy.GetParameterAsText(3)
+outProjRaster = arcpy.GetParameterAsText(4)
+# inputColormap = arcpy.GetParameterAsText(6) # Hard-code this in instead
+
+### Still to do: Edit toolbox to reflect changes in user-specified parameters
+### Also clean up the obsolete junk and comments above when done
 
 # Local variables:
-mosaicFile = outputGDB + os.sep + mosaicName
 cellSizeIn = 3.28084  #You need the input cell size first, which is in feet. Actually it would be more elegant to grab the cell size from one of the input rasters, rather than hard-coding the number.
 cellSizeOut = 1  #Set output cell size to 1 (meter), rather than 3.28084 (feet)
 resamp = "NEAREST"
 outDir = os.path.dirname(outProjRaster)
-copyMosaic = outDir + os.sep + "mosaic_copy.tif"    #Place copied mosaic in same folder as output TIFF
 
+### To do: create geodatabase named gdbName in outDir
+mosaicFile = outDir + os.sep + gdbName + os.sep + "mdTmp"
+copyMosaic = outDir + os.sep + "rdTmp.tif"    #Place copied mosaic in same folder as output TIFF
 outCoordSys = arcpy.Describe(snapRaster).spatialReference
-inCoordSys  = arcpy.Describe(inputColormap).spatialReference
 geoTrans = "NAD_1983_HARN_To_WGS_1984 + WGS_1984_(ITRF00)_To_NAD_1983"
+# inCoordSys  = arcpy.Describe(inputColormap).spatialReference ## Need to code this in below, instead
 
+### To do: check the datum of the input snap raster. If it is not NAD_1983, throw error and abort b/c then geoTrans will be inappropriate. Alternatively: make geoTrans a user-specified input, with the current transformation string as the default in the tool.
 
 # Set Geoprocessing environments
 arcpy.env.snapRaster = snapRaster
 
 #Loop through folder with all the rasters - look if the tif starts with N or S, and then add them to corresponding (N or S) raster lists 
+### To do: create a list containing only the paths to rasters with the specified criterea (i.e., raster name starts with N or S)
+# rasterList = 
+
+### To do: get the input coordinate system from the first raster in the list
+# inCoordSyst # define this variable here
+
+### To do: check coordinate systems of all rasters in list; if not all the same as inCoordSyst, throw error and abort.
 
 # Process: Create Mosaic Dataset
 arcpy.CreateMosaicDataset_management(outputGDB, mosaicName, inCoordSys, "1", "8_BIT_UNSIGNED", "NONE", "")
@@ -74,7 +88,8 @@ arcpy.AddMessage('Mosaic dataset created...')
 arcpy.AddMessage('Adding Rasters to the dataset...')
 
 # Process: Add Rasters To Mosaic Dataset
-arcpy.AddRastersToMosaicDataset_management(mosaicFile, "Raster Dataset", inputRastFolder, "UPDATE_CELL_SIZES", "UPDATE_BOUNDARY", "NO_OVERVIEWS", "", "0", "1500", inCoordSys)
+# Replaced inputRastFolder with rasterList
+arcpy.AddRastersToMosaicDataset_management(mosaicFile, "Raster Dataset", rasterList, "UPDATE_CELL_SIZES", "UPDATE_BOUNDARY", "NO_OVERVIEWS", "", "0", "1500", inCoordSys)
 
 arcpy.AddMessage('Importing geometry and setting mosaic dataset properties...')
 
@@ -86,7 +101,7 @@ arcpy.SetMosaicDatasetProperties_management(mosaicFile, "4100", "15000", "None;J
 
 arcpy.AddMessage('Copying mosaic dataset...')
 
-arcpy.CopyRaster_management(mosaicFile, copyMosaic)    #Note - need to parameterize the output folder or file here (copyMosaic)
+arcpy.CopyRaster_management(mosaicFile, copyMosaic)
 
 arcpy.AddMessage('Projecting mosaic dataset...')
 # Process: Project Raster
