@@ -2,9 +2,8 @@
 # CreateLandCoverMosaic.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2017-07-17
-# Last Edit: 2017-07-25
-# Creator(s):  Roy Gilb and DJ Helkowski
-# Edited by: Kirsten Hazler
+# Last Edit: 2017-07-27
+# Creators:  Roy Gilb, DJ Helkowski, and Kirsten Hazler
 # 
 # Summary:
 # This model creates a mosaic dataset and places it into an output geodatabase. It then adds raster tiles to the mosaic dataset. Next, the model imports mosaic dataset geometry from an imported footprint. 
@@ -35,37 +34,37 @@ arcpy.CheckOutExtension("Spatial")
 import os # provides access to operating system funtionality such as file and directory paths
 import sys # provides access to Python system functions
 import traceback # used for error handling
-# Set the necessary product code
-# import arceditor
-# KH Comment: Why the above line importing arceditor? I have never used this in a script run from an Arc toolbox.
 
 # Script arguments
-# KH Comment: Pare down the number of user-entered parameters. Have them enter an output TIF; get the output directory from that and then generate the outputGDB and mosaicName automatically. Get the Colormap from the first of the input rasters.
-# outputGDB = arcpy.GetParameterAsText(0) # Hard-code this in instead
-# mosaicName = arcpy.GetParameterAsText(1) # Hard-code this in instead
 inputRastFolder = arcpy.GetParameterAsText(0) #Folder with raster files you want to be added to the mosaic dataset
 filterString = arcpy.GetParameterAsText(1) # String (e.g., "N" or "S") used to restrict rasters selected for processing
 ### In the toolbox, make the above a drop-down with only two options
 snapRaster = arcpy.GetParameterAsText(2)
 inputFootprint = arcpy.GetParameterAsText(3)
-outProjRaster = arcpy.GetParameterAsText(4)
-# inputColormap = arcpy.GetParameterAsText(6) # Hard-code this in instead
+outProjRaster = arcpy.GetParameterAsText(4) # Need to enforce a TIF output somehow
 
 ### Still to do: Edit toolbox to reflect changes in user-specified parameters
 ### Also clean up the obsolete junk and comments above when done
 
 # Local variables:
-cellSizeIn = 3.28084  #You need the input cell size first, which is in feet. Actually it would be more elegant to grab the cell size from one of the input rasters, rather than hard-coding the number.
+cellSizeIn = 3.28084  #You need the input cell size first, which is in feet. 
 cellSizeOut = 1  #Set output cell size to 1 (meter), rather than 3.28084 (feet)
 resamp = "NEAREST"
 outDir = os.path.dirname(outProjRaster)
+outName = os.path(outProjRaster)
+baseName = outName[:-4]
 
-### To do: create geodatabase named gdbName in outDir
-mosaicFile = outDir + os.sep + gdbName + os.sep + "mdTmp"
-copyMosaic = outDir + os.sep + "rdTmp.tif"    #Place copied mosaic in same folder as output TIFF
+# Create geodatabase in output directory, for storing mosaic dataset 
+gdbName = 'Mosaics.gdb'
+arcpy.CreateFileGDB_management(outDir, gdbName)
+
+# Specify paths to mosaic dataset and raster copy
+mosaicDataset = outDir + os.sep + gdbName + os.sep + "md_%s" %baseName
+mosaicCopy = outDir + os.sep + "rd_%s.tif" %baseName    #Place copied mosaic in same folder as output TIF
+
+# Specify output coordinate system and geographic transformation
 outCoordSys = arcpy.Describe(snapRaster).spatialReference
 geoTrans = "NAD_1983_HARN_To_WGS_1984 + WGS_1984_(ITRF00)_To_NAD_1983"
-# inCoordSys  = arcpy.Describe(inputColormap).spatialReference ## Need to code this in below, instead
 
 ### To do: check the datum of the input snap raster. If it is not NAD_1983, throw error and abort b/c then geoTrans will be inappropriate. Alternatively: make geoTrans a user-specified input, with the current transformation string as the default in the tool.
 
@@ -89,23 +88,23 @@ arcpy.AddMessage('Adding Rasters to the dataset...')
 
 # Process: Add Rasters To Mosaic Dataset
 # Replaced inputRastFolder with rasterList
-arcpy.AddRastersToMosaicDataset_management(mosaicFile, "Raster Dataset", rasterList, "UPDATE_CELL_SIZES", "UPDATE_BOUNDARY", "NO_OVERVIEWS", "", "0", "1500", inCoordSys)
+arcpy.AddRastersToMosaicDataset_management(mosaicDataset, "Raster Dataset", rasterList, "UPDATE_CELL_SIZES", "UPDATE_BOUNDARY", "NO_OVERVIEWS", "", "0", "1500", inCoordSys)
 
 arcpy.AddMessage('Importing geometry and setting mosaic dataset properties...')
 
 # Process: Import Mosaic Dataset Geometry
-arcpy.ImportMosaicDatasetGeometry_management(mosaicFile, "FOOTPRINT", "Name", inputFootprint, "Tile")
+arcpy.ImportMosaicDatasetGeometry_management(mosaicDataset, "FOOTPRINT", "Name", inputFootprint, "Tile")
 
 # Process: Set Mosaic Dataset Properties
-arcpy.SetMosaicDatasetProperties_management(mosaicFile, "4100", "15000", "None;JPEG;LZ77;LERC", "None", "75", "0.01", resamp, "CLIP", "FOOTPRINTS_MAY_CONTAIN_NODATA", "CLIP", "NOT_APPLY", "", "NONE", "NorthWest;Center;LockRaster;ByAttribute;Nadir;Viewpoint;Seamline;None", "NorthWest", "", "", "ASCENDING", "FIRST", "10", "600", "300", "20", "0.8", cellSizeIn, "Basic", "Name;MinPS;MaxPS;LowPS;HighPS;Tag;GroupName;ProductName;CenterX;CenterY;ZOrder;Shape_Length;Shape_Area;Thumbnail", "DISABLED", "", "", "", "", "20", "1000", "THEMATIC", "1", "", "None")
+arcpy.SetMosaicDatasetProperties_management(mosaicDataset, "4100", "15000", "None;JPEG;LZ77;LERC", "None", "75", "0.01", resamp, "CLIP", "FOOTPRINTS_MAY_CONTAIN_NODATA", "CLIP", "NOT_APPLY", "", "NONE", "NorthWest;Center;LockRaster;ByAttribute;Nadir;Viewpoint;Seamline;None", "NorthWest", "", "", "ASCENDING", "FIRST", "10", "600", "300", "20", "0.8", cellSizeIn, "Basic", "Name;MinPS;MaxPS;LowPS;HighPS;Tag;GroupName;ProductName;CenterX;CenterY;ZOrder;Shape_Length;Shape_Area;Thumbnail", "DISABLED", "", "", "", "", "20", "1000", "THEMATIC", "1", "", "None")
 
 arcpy.AddMessage('Copying mosaic dataset...')
 
-arcpy.CopyRaster_management(mosaicFile, copyMosaic)
+arcpy.CopyRaster_management(mosaicDataset, mosaicCopy)
 
 arcpy.AddMessage('Projecting mosaic dataset...')
 # Process: Project Raster
-arcpy.ProjectRaster_management(copyMosaic, outProjRaster, outCoordSys, resamp, cellSizeOut, geoTrans, "", inCoordSys) 
+arcpy.ProjectRaster_management(mosaicCopy, outProjRaster, outCoordSys, resamp, cellSizeOut, geoTrans, "", inCoordSys) 
 
 # Process: Add Colormap
 arcpy.AddColormap_management(outProjRaster, inputColormap, "")
