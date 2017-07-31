@@ -1,2 +1,2 @@
-# Hi-Res
-Scripts and files for hi-res land cover data.
+# High-resolution Landcover Tools
+ArcGIS toolbox and associated Python scripts for working with Virginia's high-resolution land cover datasets.
