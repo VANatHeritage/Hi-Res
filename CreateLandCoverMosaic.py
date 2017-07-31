@@ -2,7 +2,7 @@
 # CreateLandCoverMosaic.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2017-07-17
-# Last Edit: 2017-07-27
+# Last Edit: 2017-07-31
 # Creators:  Roy Gilb, DJ Helkowski, and Kirsten Hazler
 # 
 # Summary:
