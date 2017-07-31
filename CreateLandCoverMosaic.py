@@ -37,14 +37,16 @@ import traceback # used for error handling
 
 # Script arguments
 inDir = arcpy.GetParameterAsText(0) # Folder with raster files you want to be added to the mosaic dataset.  
-filterString = arcpy.GetParameterAsText(1) # Prefix string (e.g., "N" or "S") used to restrict rasters selected for processing
-### In the toolbox, make the above a drop-down with only two options
+filterString = arcpy.GetParameterAsText(1) # Prefix string used to restrict rasters selected for processing
+### To Do: In toolbox, make the above a drop-down with only two options ("N" or "S")
 snapRaster = arcpy.GetParameterAsText(2) # This will be used to set output coordinate system and pixel alignment
 inFootprint = arcpy.GetParameterAsText(3)
-outTIFF = arcpy.GetParameterAsText(4) # Need to enforce a TIF output somehow
+delivArea = arcpy.GetParameterAsText(4) # The delivery area to process.
+### To Do: In toolbox, make the above a string type filtered by a value list for user to choose from, based on all possible values from the "Delivery A" field in both tile reference shapefiles
+outTIFF = arcpy.GetParameterAsText(5) # Need to enforce a TIF output somehow
 
-### Still to do: Edit toolbox to reflect changes in user-specified parameters
-### Also clean up the obsolete junk and comments above when done
+### To do: Edit toolbox to reflect changes in user-specified parameters
+### To do: clean up the obsolete junk and comments above when done
 
 # Local variables:
 cellSizeIn = 3.28084  #You need the input cell size first, which is in feet. 
@@ -63,20 +65,23 @@ mosaicDataset = outDir + os.sep + gdbName + os.sep + "md_%s" %baseName
 mosaicCopy = outDir + os.sep + "rd_%s.tif" %baseName    #Place copied mosaic in same folder as output TIF
 
 # Specify output coordinate system and snap raster
-outCS = arcpy.Describe(snapRaster).spatialReference
+outCoordSys = arcpy.Describe(snapRaster).spatialReference
 arcpy.env.snapRaster = snapRaster
-geoTrans = "NAD_1983_HARN_To_WGS_1984 + WGS_1984_(ITRF00)_To_NAD_1983"
 
-# Loop through folder with all the rasters - look if the tif starts with N or S, and then add them to corresponding (N or S) raster lists 
-### To do: create a list containing only the paths to rasters with the specified criterea (i.e., raster name starts with N or S)
-
+# Create a list containing only the paths to rasters with the specified criteria 
 arcpy.env.workspace = inDir
-# rasterList = 
+rasterList = arcpy.ListRasters("%s*" %filterString, "TIF")
 
-### To do: get the input coordinate system from the first raster in the list
-# inCoordSys # define this variable here
+# Get the input coordinate system from the first raster in the list
+inCoordSys = arcpy.Describe(rasterList[0]).spatialReference
 
-### To do: check coordinate systems of all rasters in list; if not all the same as inCoordSys, throw error and abort.
+# Check coordinate systems of all remaining rasters in list
+# If not all the same as inCoordSys from first raster, throw error and abort.
+for rast in rasterList[1:]:
+   cs = arcpy.Describe(rast).spatialReference.Name
+   if cs != inCoordSys.Name:
+      arcpy.AddError('Coordinate systems do not match for all rasters in directory. Aborting operation.')
+      sys.exit()
 
 # Process: Create Mosaic Dataset
 arcpy.CreateMosaicDataset_management(outputGDB, mosaicName, inCoordSys, "1", "8_BIT_UNSIGNED", "NONE", "")
@@ -86,23 +91,42 @@ arcpy.AddMessage('Adding Rasters to the dataset...')
 
 # Process: Add Rasters To Mosaic Dataset
 # Replaced inDir with rasterList
-arcpy.AddRastersToMosaicDataset_management(mosaicDataset, "Raster Dataset", rasterList, "UPDATE_CELL_SIZES", "UPDATE_BOUNDARY", "NO_OVERVIEWS", "", "0", "1500", inCoordSys)
+arcpy.AddRastersToMosaicDataset_management(mosaicDataset, "Raster Dataset", rasterList, "", "UPDATE_BOUNDARY", "NO_OVERVIEWS", "", "", "", inCoordSys)
 
 arcpy.AddMessage('Importing geometry and setting mosaic dataset properties...')
+### To do: Create a layer representing only the footprints corresponding to the selected delivery area. Call it lyrFootprint.
 
 # Process: Import Mosaic Dataset Geometry
-arcpy.ImportMosaicDatasetGeometry_management(mosaicDataset, "FOOTPRINT", "Name", inFootprint, "Tile")
+arcpy.ImportMosaicDatasetGeometry_management(mosaicDataset, "FOOTPRINT", "Name", lyrFootprint, "Tile")
 
 # Process: Set Mosaic Dataset Properties
-arcpy.SetMosaicDatasetProperties_management(mosaicDataset, "4100", "15000", "None;JPEG;LZ77;LERC", "None", "75", "0.01", resamp, "CLIP", "FOOTPRINTS_MAY_CONTAIN_NODATA", "CLIP", "NOT_APPLY", "", "NONE", "NorthWest;Center;LockRaster;ByAttribute;Nadir;Viewpoint;Seamline;None", "NorthWest", "", "", "ASCENDING", "FIRST", "10", "600", "300", "20", "0.8", cellSizeIn, "Basic", "Name;MinPS;MaxPS;LowPS;HighPS;Tag;GroupName;ProductName;CenterX;CenterY;ZOrder;Shape_Length;Shape_Area;Thumbnail", "DISABLED", "", "", "", "", "20", "1000", "THEMATIC", "1", "", "None")
+arcpy.SetMosaicDatasetProperties_management(mosaicDataset, "", "", "", "None", "", "", resamp, "NOT_CLIP", "FOOTPRINTS_MAY_CONTAIN_NODATA", "CLIP", "NOT_APPLY", "", "", "Center", "Center", "", "", "", "MAX", "", "", "", "", "", cellSizeIn, "Basic", "", "", "", "", "", "", "", "", "THEMATIC", "1", "", "None")
 
+# Process: Copy Raster
 arcpy.AddMessage('Copying mosaic dataset...')
-
 arcpy.CopyRaster_management(mosaicDataset, mosaicCopy)
 
-arcpy.AddMessage('Projecting mosaic dataset...')
-# Process: Project Raster
-arcpy.ProjectRaster_management(mosaicCopy, outTIFF, outCS, resamp, cellSizeOut, geoTrans, "", inCoordSys) 
+# Check if coordinate system for mosaicCopy is the same as for snapRaster. 
+# If it is, no need to re-project, and mosaicCopy is final product. 
+if inCoordSys.Name = outCoordSys.Name:
+   arcpy.AddMessage('No reprojection necessary.')
+   ### To do: rename copyMosaic to be the name of the user-selected output name
+else:
+   arcpy.AddMessage('Projecting mosaic...')
+   # First check if a geographic transformation is needed
+   inGCS_name = inCoordSys.GCS.Name
+   outGCS_name = outCoordSys.GCS.Name
+   if inGCS_name == outGCS_name:
+      arcpy.AddMessage('Datums are the same; no geographic transformation needed.')
+      geoTrans = ""
+   else:
+      arcpy.AddMessage('Datums do not match; re-projecting with geographic transformation')
+      # Get the list of applicable geographic transformations
+      transList = arcpy.ListTransformations(inCoordSys,outCoordSys)
+      # Extract the first item in the list which I hope is the right transformation to use
+      geoTrans = transList[0]
+   # Process: Project Raster
+   arcpy.ProjectRaster_management(mosaicCopy, outTIFF, outCoordSys, resamp, cellSizeOut, geoTrans, "", inCoordSys) 
 
 # Process: Add Colormap
 arcpy.AddColormap_management(outTIFF, inputColormap, "")
