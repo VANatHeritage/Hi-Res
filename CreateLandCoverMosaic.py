@@ -2,7 +2,7 @@
 # CreateLandCoverMosaic.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2017-07-17
-# Last Edit: 2017-07-31
+# Last Edit: 2017-08-03
 # Creators:  Roy Gilb, DJ Helkowski, and Kirsten Hazler
 # 
 # Summary:
@@ -13,18 +13,18 @@
 #
 # Dependencies:
 #
-# Syntax: CreateLandCoverMosaic <outputGDB> <mosaicName> <inDir> <snapRaster> <inFootprint> <outTIFF> <inputColormap> <outputDataset> 
+# Syntax: CreateLandCoverMosaic <inDir> <filterString> <snapRaster> <inFootprint> <delivArea>  <inputColormap> <outTIFF> 
 # Description: 
 # 
 # Parameters:
-# Mosaic Dataset Name - select a name for your mosaic dataset.
-# Output Geodatabase - select a geodatabase for your mosaic dataset to be stored in.
 # Input Raster Folder - Select the folder containing the raster files you want to be added to the mosaic dataset. 
 #                       These input rasters are in the NAD 1983 HARN State Plane Virginia North OR South FIPS 4502 Feet coordinate system.
-# Input Footprint Geometry - Select a feature class whose footprint will match the mosaic dataset.
+# Footprint region filter string - String value drop-down menu of 'N' or 'S' 
 # Snap Raster - Select a snap raster that is in the Virginia Lambert coordinate system. 
-# Output Projected Raster - Select the name and storage of your projected raster.
+# Input Footprint Geometry - Select a feature class whose footprint will match the mosaic dataset.
+# Delivery area - String value from a drop-down menu, taken from the 'Delivery A' field in the tile reference (footprint) shapefiles
 # Input Raster Colormap - select the raster file from which you want to import a colormap to the output raster dataset. 
+# Output TIF - Output tif file of the re-projected mosaic dataset
 
 # ---------------------------------------------------------------------------
 #import modules
@@ -37,23 +37,19 @@ import traceback # used for error handling
 
 # Script arguments
 inDir = arcpy.GetParameterAsText(0) # Folder with raster files you want to be added to the mosaic dataset.  
-filterString = arcpy.GetParameterAsText(1) # Prefix string used to restrict rasters selected for processing
-### To Do: In toolbox, make the above a drop-down with only two options ("N" or "S")
+filterString = arcpy.GetParameterAsText(1) # Prefix string used to restrict rasters selected for processingy
 snapRaster = arcpy.GetParameterAsText(2) # This will be used to set output coordinate system and pixel alignment
-inFootprint = arcpy.GetParameterAsText(3)
+inFootprint = arcpy.GetParameterAsText(3) #The footprint geometry for creating the mosaic dataset. Ex) TileReference_BayAreas.shp
 delivArea = arcpy.GetParameterAsText(4) # The delivery area to process.
-### To Do: In toolbox, make the above a string type filtered by a value list for user to choose from, based on all possible values from the "Delivery A" field in both tile reference shapefiles
-outTIFF = arcpy.GetParameterAsText(5) # Need to enforce a TIF output somehow
-
-### To do: Edit toolbox to reflect changes in user-specified parameters
-### To do: clean up the obsolete junk and comments above when done
+inputColormap = arcpy.GetParameterAsText(5) #Input raster tile used to set the colormap. Ex) S12_23.tif
+outTIFF = arcpy.GetParameterAsText(6) # Output TIFF file. Need to enforce a TIF output somehow
 
 # Local variables:
 cellSizeIn = 3.28084  #You need the input cell size first, which is in feet. 
 cellSizeOut = 1  #Set output cell size to 1 (meter), rather than 3.28084 (feet)
 resamp = "NEAREST"
 outDir = os.path.dirname(outTIFF)
-outName = os.path(outTIFF)
+outName = os.path.basename(outTIFF)
 baseName = outName[:-4]
 
 # Create geodatabase in output directory, for storing mosaic dataset 
@@ -84,7 +80,7 @@ for rast in rasterList[1:]:
       sys.exit()
 
 # Process: Create Mosaic Dataset
-arcpy.CreateMosaicDataset_management(outputGDB, mosaicName, inCoordSys, "1", "8_BIT_UNSIGNED", "NONE", "")
+arcpy.CreateMosaicDataset_management(outDir + os.sep + gdbName, "md_%s" %baseName, inCoordSys, "1", "8_BIT_UNSIGNED", "NONE", "")
 
 arcpy.AddMessage('Mosaic dataset created...')
 arcpy.AddMessage('Adding Rasters to the dataset...')
@@ -94,7 +90,9 @@ arcpy.AddMessage('Adding Rasters to the dataset...')
 arcpy.AddRastersToMosaicDataset_management(mosaicDataset, "Raster Dataset", rasterList, "", "UPDATE_BOUNDARY", "NO_OVERVIEWS", "", "", "", inCoordSys)
 
 arcpy.AddMessage('Importing geometry and setting mosaic dataset properties...')
-### To do: Create a layer representing only the footprints corresponding to the selected delivery area. Call it lyrFootprint.
+
+# Create a layer representing only the footprints corresponding to the selected delivery area.
+lyrFootprint = arcpy.MakeFeatureLayer_management(inFootprint, 'lyrFootprint', """"Delivery_A" = '%s'""" %delivArea )
 
 # Process: Import Mosaic Dataset Geometry
 arcpy.ImportMosaicDatasetGeometry_management(mosaicDataset, "FOOTPRINT", "Name", lyrFootprint, "Tile")
@@ -108,7 +106,7 @@ arcpy.CopyRaster_management(mosaicDataset, mosaicCopy)
 
 # Check if coordinate system for mosaicCopy is the same as for snapRaster. 
 # If it is, no need to re-project, and mosaicCopy is final product. 
-if inCoordSys.Name = outCoordSys.Name:
+if inCoordSys.Name == outCoordSys.Name:
    arcpy.AddMessage('No reprojection necessary.')
    ### To do: rename copyMosaic to be the name of the user-selected output name
 else:
